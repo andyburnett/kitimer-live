@@ -1,0 +1,43 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Function to validate the project code format (document ID)
+    function isValidProjectCode(code) {
+      return code.matches('^\\d{4}$'); 
+    }
+
+    match /timers/{projectCode} {
+      
+      // RULE 1: READ ACCESS (VIEWER MODE) - Remains secure and functional
+      // Anyone can read if the URL path is a valid 4-digit code.
+      allow read: if isValidProjectCode(projectCode); 
+      
+      // RULE 2: WRITE ACCESS (FACILITATOR CONTROL - FINAL FAILSAFE)
+
+      // Allow CREATE (SET button) if:
+      // A) The user is authenticated (ANY Google account).
+      // B) The code is valid, and C) The document has the correct field types.
+      allow create: if request.auth != null && isValidProjectCode(projectCode) && (
+          request.resource.data.status is string 
+          && request.resource.data.durationSeconds is number 
+          && request.resource.data.remainingAtPause is number
+          && request.resource.data.projectCode is string
+      );
+
+      // Allow UPDATE (START/PAUSE button) if:
+      // A) The user is authenticated (ANY Google account).
+      // B) The code is valid, and C) ONLY the expected runtime fields are modified.
+      allow update: if request.auth != null && isValidProjectCode(projectCode) && (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status', 
+            'startTime', 
+            'remainingAtPause', 
+            'durationSeconds'
+          ])
+      );
+      
+      allow delete: if false; 
+    }
+  }
+}
