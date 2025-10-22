@@ -1,5 +1,6 @@
 // Initialize Firebase using the config block from index.html
 // NOTE: firebaseConfig is defined in index.html and must contain your actual project keys
+// It is assumed firebaseConfig is available in the global scope from index.html
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
@@ -11,31 +12,43 @@ let countdownInterval = null;
 const MAX_DURATION_MINUTES = 60;
 const REQUIRED_DOMAIN = '@knowinnovation.com'; // Kept for reference, not security.
 
-// Get elements
+// Get elements (UPDATED FOR NEW UI STRUCTURE)
 const statusMessageEl = document.getElementById('status-message');
-const loginButton = document.getElementById('login-button');      
+const facilitatorTrigger = document.getElementById('facilitator-trigger'); // NEW: Discreet icon trigger
+const controlModal = document.getElementById('control-modal'); // NEW: Modal/Overlay for controls
+const closeModalButton = document.getElementById('close-controls'); // NEW
+const logoutButton = document.getElementById('logout-button'); // NEW: Sign out button inside modal
+const authStatusInfoEl = document.getElementById('auth-status-info'); // NEW: Displays user info in modal
+const modalTimeDisplayEl = document.getElementById('modal-time-display'); // NEW: To show time inside the modal
+
 const projectInfoEl = document.getElementById('project-info');
 const timeDisplayEl = document.getElementById('time-display');
 const statusDisplayEl = document.getElementById('current-status');
-const controlPanelEl = document.getElementById('control-panel');
+const controlPanelEl = document.getElementById('control-panel'); // Remains the container for controls
 const viewerLandingEl = document.getElementById('viewer-landing');
 const timerInterfaceEl = document.getElementById('timer-interface');
 const codeInputEl = document.getElementById('project-code-input');
 const goButton = document.getElementById('go-button');
 
 const setButton = document.getElementById('set-button');
-const startButton = document.getElementById('start-button');
-const pauseButton = document.getElementById('pause-button');
-const stopButton = document.getElementById('stop-button');
+const toggleButton = document.getElementById('toggle-button'); // NEW: Replaces startButton/pauseButton
+const resetButton = document.getElementById('reset-button'); // RENAMED from stopButton
 const durationInput = document.getElementById('duration');
 
 
 // --- UTILITY FUNCTIONS ---
 
 function formatTime(totalSeconds) {
-    const minutes = Math.floor(Math.max(0, totalSeconds) / 60);
-    const seconds = Math.floor(Math.max(0, totalSeconds) % 60);
+    // If timer runs for over an hour, show HH:MM:SS, otherwise MM:SS
+    const totalSecondsInt = Math.floor(Math.max(0, totalSeconds));
+    const hours = Math.floor(totalSecondsInt / 3600);
+    const minutes = Math.floor((totalSecondsInt % 3600) / 60);
+    const seconds = totalSecondsInt % 60;
     const pad = (num) => num.toString().padStart(2, '0');
+
+    if (hours > 0) {
+        return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+    }
     return `${pad(minutes)}:${pad(seconds)}`;
 }
 
@@ -45,6 +58,7 @@ function calculateTimeRemaining(timerState) {
     if (durationSeconds == null) return 0;
     
     if (status === 'running' && startTime) {
+        // Firebase Timestamp needs .toMillis()
         const elapsed = (Date.now() - startTime.toMillis()) / 1000;
         return Math.max(0, durationSeconds - elapsed);
     } 
@@ -62,6 +76,8 @@ function startClientCountdown(timerState) {
     }
 
     let secondsLeft = calculateTimeRemaining(timerState);
+    
+    // --- UI State Management for Viewer Mode ---
     timeDisplayEl.textContent = formatTime(secondsLeft);
     statusDisplayEl.textContent = timerState.status.toUpperCase();
     
@@ -69,6 +85,29 @@ function startClientCountdown(timerState) {
         statusDisplayEl.textContent = 'TIME UP!';
         timeDisplayEl.textContent = '00:00';
     }
+    
+    // --- UI State Management for Facilitator Mode (Toggle Button & Modal Time) ---
+    const formattedTime = formatTime(secondsLeft);
+    
+    // Update Modal Time Display
+    if (modalTimeDisplayEl) {
+        modalTimeDisplayEl.textContent = formattedTime;
+    }
+    
+    if (isFacilitator) {
+        if (timerState.status === 'running') {
+            toggleButton.textContent = 'PAUSE';
+            toggleButton.classList.remove('start-style');
+            toggleButton.classList.add('pause-style');
+            toggleButton.innerHTML = '<i class="fas fa-pause"></i> PAUSE'; // Icon update
+        } else {
+            toggleButton.textContent = 'START';
+            toggleButton.classList.remove('pause-style');
+            toggleButton.classList.add('start-style');
+            toggleButton.innerHTML = '<i class="fas fa-play"></i> START'; // Icon update
+        }
+    }
+    // --- END UI State Management ---
 
     if (timerState.status === 'running') {
         const startTimeMillis = timerState.startTime.toMillis();
@@ -77,12 +116,16 @@ function startClientCountdown(timerState) {
             const elapsed = (Date.now() - startTimeMillis) / 1000;
             secondsLeft = timerState.durationSeconds - elapsed;
             
+            const currentFormattedTime = formatTime(secondsLeft);
+
             if (secondsLeft <= 0) {
-                timeDisplayEl.textContent = '00:00';
+                timeDisplayEl.textContent = formatTime(0);
                 statusDisplayEl.textContent = 'TIME UP!';
+                if (modalTimeDisplayEl) modalTimeDisplayEl.textContent = formatTime(0);
                 clearInterval(countdownInterval);
             } else {
-                timeDisplayEl.textContent = formatTime(secondsLeft);
+                timeDisplayEl.textContent = currentFormattedTime;
+                if (modalTimeDisplayEl) modalTimeDisplayEl.textContent = currentFormattedTime; // Update modal time display
             }
         }, 1000); 
     }
@@ -109,13 +152,15 @@ async function updateTimerState(updates) {
 
 // --- Event Listeners for Control Buttons ---
 
+// SET Button
 setButton.addEventListener('click', () => {
     const durationMinutes = parseInt(durationInput.value);
-    if (isNaN(durationMinutes) || durationMinutes < 1 || durationMinutes > MAX_DURATION_MINUTES) {
-        alert(`Please enter a valid duration between 1 and ${MAX_DURATION_MINUTES} minutes.`);
+    if (isNaN(durationMinutes) || durationMinutes < 1) {
+        alert(`Please enter a valid duration of 1 minute or more.`);
         return;
     }
-    const durationSeconds = durationMinutes * 60;
+    
+    const durationSeconds = durationMinutes * 60; 
     
     db.collection('timers').doc(projectCode).set({
         projectCode: projectCode,
@@ -129,32 +174,36 @@ setButton.addEventListener('click', () => {
     });
 });
 
-startButton.addEventListener('click', async () => {
+// Toggle Button (Start/Pause) Logic
+toggleButton.addEventListener('click', async () => {
     const doc = await db.collection('timers').doc(projectCode).get();
     const currentTimer = doc.data();
-    
-    if (!currentTimer || currentTimer.status === 'running') return;
 
-    let newStartTime = firebase.firestore.Timestamp.now();
-    let durationToStartFrom = currentTimer.durationSeconds || (10 * 60); 
+    if (!currentTimer || currentTimer.status === 'stopped' || currentTimer.status === 'paused') {
+        // ACTION: START
+        
+        // Ensure a duration is set before starting
+        if (!currentTimer || currentTimer.durationSeconds == null || currentTimer.durationSeconds === 0) {
+            alert("Please set the timer duration before starting.");
+            return;
+        }
 
-    if (currentTimer.status === 'paused' && currentTimer.remainingAtPause != null) {
-         durationToStartFrom = currentTimer.remainingAtPause;
-    } 
-    
-    updateTimerState({
-        status: 'running',
-        startTime: newStartTime,
-        durationSeconds: durationToStartFrom,
-        remainingAtPause: null 
-    });
-});
+        let newStartTime = firebase.firestore.Timestamp.now();
+        let durationToStartFrom = (currentTimer && currentTimer.durationSeconds) || (10 * 60); 
 
-pauseButton.addEventListener('click', async () => {
-    const doc = await db.collection('timers').doc(projectCode).get();
-    const currentTimer = doc.data();
-    
-    if (currentTimer && currentTimer.status === 'running') {
+        if (currentTimer && currentTimer.status === 'paused' && currentTimer.remainingAtPause != null) {
+             durationToStartFrom = currentTimer.remainingAtPause;
+        } 
+        
+        updateTimerState({
+            status: 'running',
+            startTime: newStartTime,
+            durationSeconds: durationToStartFrom,
+            remainingAtPause: null 
+        });
+
+    } else if (currentTimer.status === 'running') {
+        // ACTION: PAUSE
         const timeRemaining = calculateTimeRemaining(currentTimer);
         
         updateTimerState({
@@ -165,11 +214,18 @@ pauseButton.addEventListener('click', async () => {
     }
 });
 
-stopButton.addEventListener('click', async () => {
+
+// RESET Button
+resetButton.addEventListener('click', async () => {
     const doc = await db.collection('timers').doc(projectCode).get();
     const currentTimer = doc.data();
     
-    const durationToReset = currentTimer.durationSeconds || (10 * 60); 
+    if (!currentTimer || currentTimer.durationSeconds == null) {
+        alert("Cannot reset: Timer duration has not been set.");
+        return;
+    }
+
+    const durationToReset = currentTimer.durationSeconds; 
 
     updateTimerState({
         status: 'stopped',
@@ -187,7 +243,11 @@ goButton.addEventListener('click', () => {
     if (code && code.match(/^\d{4}$/)) {
         window.location.pathname = `/${code}`;
     } else {
-        alert("Please enter a valid 4-digit project code.");
+        statusMessageEl.textContent = "Please enter a valid 4-digit project code.";
+        statusMessageEl.style.color = 'red';
+        setTimeout(() => {
+            statusMessageEl.textContent = '';
+        }, 5000);
     }
 });
 
@@ -199,15 +259,17 @@ function startTimerInterface(code) {
     timerInterfaceEl.classList.remove('hidden'); 
     viewerLandingEl.classList.add('hidden'); 
 
-    projectInfoEl.textContent = `Project Code: ${projectCode}`;
+    projectInfoEl.textContent = `Project: ${projectCode}`;
 
     db.collection('timers').doc(projectCode)
         .onSnapshot((doc) => {
             const timerState = doc.data();
             
-            if (!doc.exists || !timerState) {
-                timeDisplayEl.textContent = 'Awaiting Setup...';
-                statusDisplayEl.textContent = isFacilitator ? 'Click SET above to create timer.' : 'Ask a facilitator to set the timer.';
+            if (!doc.exists || !timerState || timerState.durationSeconds == null) {
+                // Timer is NOT set up for this code
+                timeDisplayEl.textContent = '00:00';
+                statusDisplayEl.textContent = isFacilitator ? 'Click SET in controls to create timer.' : 'Awaiting Setup...';
+                if (modalTimeDisplayEl) modalTimeDisplayEl.textContent = '00:00';
                 clearInterval(countdownInterval);
                 return;
             }
@@ -221,7 +283,10 @@ function startTimerInterface(code) {
 
 // Router function is run only after auth state is determined
 function routeApp() {
-    const path = window.location.pathname.split('/').pop();
+    // Get the path segment after the domain, splitting by '/'
+    const pathSegments = window.location.pathname.split('/');
+    // Get the last non-empty segment, which should be the code
+    const path = pathSegments.pop() || pathSegments.pop(); // Handles trailing slashes
 
     if (!path || path === 'index.html') {
         // CASE 1: URL is root (/) -> Show the landing page
@@ -234,37 +299,84 @@ function routeApp() {
         // CASE 3: Invalid code in URL
         viewerLandingEl.classList.add('hidden');
         timerInterfaceEl.classList.remove('hidden');
-        projectInfoEl.innerHTML = `<h2 style="color:red;">Error: Invalid URL.</h2>`;
+        projectInfoEl.innerHTML = `<h2 style="color:red;">Error: Invalid Project Code in URL.</h2>`;
         statusDisplayEl.textContent = '';
         timeDisplayEl.textContent = 'ERR';
+        clearInterval(countdownInterval);
     }
 }
 
 
-// ... (All code before the AUTHENTICATION FLOW section remains the same)
+// --- FACILITATOR UI LOGIC ---
 
-// --- AUTHENTICATION FLOW (The Final Debug Version) ---
+// Toggles the visibility of the control modal
+function toggleControlModal(show) {
+    if (show && isFacilitator) {
+        controlModal.classList.remove('hidden');
+    } else {
+        controlModal.classList.add('hidden');
+    }
+}
 
-// Re-usable function to update UI/State and perform routing
+// Event listener for the discreet trigger icon (Only exists if timerInterfaceEl is present)
+if (facilitatorTrigger) {
+    facilitatorTrigger.addEventListener('click', () => {
+        if (isFacilitator) {
+            // Logged in: show controls
+            toggleControlModal(true);
+        } else {
+            // Not logged in: trigger login
+            standardSignIn();
+        }
+    });
+}
+
+// Event listener to close the modal
+if (closeModalButton) {
+    closeModalButton.addEventListener('click', () => toggleControlModal(false));
+}
+
+
+// --- AUTHENTICATION FLOW ---
+
+// Standard login action switched to redirect (mobile fix)
+const standardSignIn = () => {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' }); 
+    auth.signInWithRedirect(provider); 
+};
+
+
+// Re-usable function to update UI/State and perform routing (FIXED SIGN-OUT LOGIC)
 function initializeAppWithAuth(user) {
     console.log("2. Auth state processed. User:", user ? user.uid : "null");
     clearInterval(countdownInterval);
     
-    // Set up state based on the resolved 'user' object (either from redirect or persistence)
+    // Set up state based on the resolved 'user' object
     if (user) {
         // Logged In
         isFacilitator = true; 
-        statusMessageEl.innerHTML = `Signed in as: <strong>${user.email}</strong> (Controls shown. Server enforces permissions.)`;
-        loginButton.textContent = 'Sign out';
-        loginButton.onclick = () => { auth.signOut(); }; 
-        controlPanelEl.classList.remove('hidden');
+        authStatusInfoEl.innerHTML = `Signed in as: <strong>${user.email}</strong>`; // Display user email in modal
+        
+        // FIX 1: Correctly sign out and reset app state
+        logoutButton.innerHTML = '<i class="fas fa-sign-out-alt"></i> Sign out';
+        logoutButton.onclick = () => { 
+            auth.signOut().then(() => {
+                toggleControlModal(false); // Hide modal immediately
+                initializeAppWithAuth(null); // Force reset of application state and UI
+            }).catch(error => {
+                console.error("Sign out error:", error);
+                // Even on error, attempt to reset client-side state
+                initializeAppWithAuth(null); 
+            }); 
+        }; 
     } else {
         // Signed Out
         isFacilitator = false;
-        statusMessageEl.textContent = 'Viewer Mode.'; 
-        loginButton.textContent = 'Sign in with Google (Facilitator)';
-        loginButton.onclick = standardSignIn;
-        controlPanelEl.classList.add('hidden');
+        authStatusInfoEl.textContent = 'Facilitator Sign In Required';
+        logoutButton.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign in with Google';
+        logoutButton.onclick = standardSignIn;
+        toggleControlModal(false); // Ensure modal is hidden
     }
     
     // 3. Only route after the authentication state has been fully determined (on the first load).
@@ -276,41 +388,22 @@ function initializeAppWithAuth(user) {
 }
 
 
-// Standard login action switched to redirect (mobile fix)
-const standardSignIn = () => {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: 'select_account','hd': 'kitimer-live.web.app/auth-callback.html' });
-    auth.signInWithRedirect(provider); 
-};
-
-
-// Button click listener uses the standardSignIn function
-loginButton.addEventListener('click', standardSignIn);
-
-
 // A flag to ensure we only route the first time after auth is checked
 let hasRouted = false; 
 
 // 🔑 CRITICAL FIX: The logic is now entirely promise-based. 
-// We chain persistence, redirect result, and then check for an existing session.
 auth.setPersistence(firebase.auth.Auth.Persistence.SESSION)
     .then(() => {
-        console.log("Firebase Auth Persistence set to SESSION for redirect reliability."); // LINE 298 (Debug 1)
+        console.log("Firebase Auth Persistence set to SESSION for redirect reliability.");
 
         // Step 1: Check for the redirect result first. This handles the login return.
         return auth.getRedirectResult();
     })
     .then((result) => {
-        // --- NEW DEBUG LOGS START ---
-        console.log("DEBUG: getRedirectResult() resolved.");
-        console.log("DEBUG: Result object:", result); 
-        console.log("DEBUG: Result user object:", result ? result.user : 'null');
-        // --- NEW DEBUG LOGS END ---
         
         if (result && result.user) {
             // CASE A: Successfully resolved the redirect user (login success). 
             console.log("1. Redirect sign-in successful. User:", result.user.email);
-            // Use the resolved user to initialize the app IMMEDIATELY.
             initializeAppWithAuth(result.user);
             
         } else {
@@ -320,10 +413,10 @@ auth.setPersistence(firebase.auth.Auth.Persistence.SESSION)
             const user = auth.currentUser;
             
             if (user) {
-                // Persistent session found (User was logged in before the page load)
+                // Persistent session found
                 initializeAppWithAuth(user);
             } else {
-                // No session and no redirect result (Fresh load/signed out)
+                // No session and no redirect result
                 initializeAppWithAuth(null);
             }
         }
@@ -331,8 +424,5 @@ auth.setPersistence(firebase.auth.Auth.Persistence.SESSION)
     .catch((error) => {
         // This catch block handles errors from setPersistence AND getRedirectResult
         console.error("Authentication Initialization Error:", error);
-        statusMessageEl.textContent = `Login failed: ${error.message}`;
-        
-        // Ensure the app starts in viewer mode even if initialization fails.
         initializeAppWithAuth(null);
     });

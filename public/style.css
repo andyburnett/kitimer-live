@@ -1,0 +1,275 @@
+/* BASE & MOBILE RESET */
+body { 
+    font-family: Arial, sans-serif; 
+    text-align: center; 
+    margin: 0; 
+    padding: 0;
+    /* Dark Theme Default for Viewer */
+    background-color: #111111; 
+    color: #FFFFFF; 
+    height: 100vh;
+    overflow: hidden; /* Prevents scroll on large time display */
+}
+
+.hidden { display: none !important; }
+
+/* --- VIEWER MODE (TIMER DISPLAY) --- */
+
+.screen-view {
+    height: 100vh;
+    width: 100vw;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+/* Time Display - Key to Readability */
+.timer-display { 
+    font-family: 'Roboto Mono', monospace; /* Monospaced for consistent number width */
+    font-size: min(20vh, 25vw); /* Ensures it fills largest possible area */
+    font-weight: 700; 
+    color: #FFFFFF; /* High contrast white */
+    line-height: 1; /* Tight spacing */
+    margin: 5vh 0;
+    text-shadow: 0 0 15px rgba(255, 255, 255, 0.4); /* Subtle glow */
+}
+
+.status-display { 
+    font-size: 4vh; 
+    color: #AAAAAA; /* Gray for secondary info */
+    font-weight: bold;
+    letter-spacing: 0.2em;
+}
+
+#project-info { 
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    font-size: 2vh; 
+    color: #666666;
+}
+
+/* --- LANDING PAGE STYLES --- */
+#viewer-landing {
+    background-color: #111111;
+}
+
+.landing-text {
+    font-size: 5vw;
+    margin-bottom: 20px;
+}
+
+.input-group {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#project-code-input { 
+    padding: 15px; 
+    font-size: 20px; 
+    width: 150px; 
+    text-align: center; 
+    border: 3px solid #666; 
+    border-radius: 8px; 
+    margin-right: 10px; 
+    background-color: #333;
+    color: #FFF;
+}
+
+#go-button { 
+    padding: 15px 25px; 
+    font-size: 20px; 
+    background-color: #2E86C1; /* Clean Blue */
+    color: white; 
+    border: none; 
+    border-radius: 8px; 
+    cursor: pointer;
+}
+
+/* --- FACILITATOR TRIGGER --- */
+#facilitator-trigger {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    background: none;
+    border: none;
+    color: #444444; /* Very subtle */
+    font-size: 30px;
+    cursor: pointer;
+    transition: color 0.3s;
+    z-index: 5; /* Ensure it's above the timer numbers */
+}
+
+#facilitator-trigger:hover {
+    color: #888888;
+}
+
+/* --- FACILITATOR MODAL (Control Panel) --- */
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.95); /* Darker overlay to ensure panel visibility */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000; /* Above all other content */
+}
+
+.modal-content {
+    background-color: #FFFFFF; /* Light theme for controls */
+    color: #333;
+    padding: 20px;
+    border-radius: 10px;
+    width: 95%; /* Mobile first, slightly wider */
+    max-width: 450px; /* Tablet/Desktop Cap */
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.5);
+    position: relative;
+    text-align: left;
+}
+
+.close-button {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #888;
+}
+
+#auth-status-info {
+    text-align: center;
+    color: #777;
+    margin-bottom: 5px;
+}
+
+/* FIXED: Modal Time Display - Prominent for Facilitator */
+.modal-time-display {
+    font-family: 'Roboto Mono', monospace;
+    font-size: 8vh; /* Make it large within the modal */
+    font-weight: 700;
+    color: #34495E; /* Dark color for readability on light background */
+    margin: 15px 0 25px 0;
+    text-align: center;
+    border-bottom: 2px solid #ECF0F1;
+    padding-bottom: 10px;
+}
+
+.control-section {
+    margin: 15px 0;
+    padding: 15px;
+    border: 1px solid #EEE;
+    border-radius: 8px;
+}
+
+.control-panel label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+    font-size: 0.95em;
+}
+
+/* Input Styles */
+.input-group-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.control-panel input[type="number"] {
+    padding: 10px; 
+    font-size: 16px; 
+    width: 80px; 
+    border: 1px solid #ccc; 
+    border-radius: 5px; 
+    text-align: center;
+}
+
+/* Buttons */
+.control-panel button, .logout-button { 
+    padding: 12px 15px; 
+    font-size: 16px; 
+    margin: 5px 0; 
+    cursor: pointer; 
+    border: none; 
+    border-radius: 5px; 
+    transition: background-color 0.2s;
+    font-weight: bold;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.control-panel button i, .logout-button i {
+    margin-right: 8px;
+}
+
+/* Set Button */
+#set-button { 
+    background-color: #3498DB; /* Blue */
+    color: white; 
+    margin-left: 10px;
+}
+
+/* Action Buttons Group */
+.action-buttons {
+    display: flex;
+    justify-content: space-between;
+}
+
+/* Toggle Button (Start/Pause) */
+#toggle-button {
+    flex-grow: 1;
+    margin-right: 10px;
+    color: white;
+}
+
+.start-style { /* Green for Start */
+    background-color: #2ECC71; 
+}
+
+.pause-style { /* Amber for Pause */
+    background-color: #F39C12;
+}
+
+/* Reset Button */
+#reset-button { 
+    background-color: #E74C3C; /* Red */
+    color: white;
+}
+
+.logout-button {
+    background: #E5E7E9;
+    color: #333;
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 5px;
+    margin-top: 15px;
+}
+
+/* --- DESKTOP/TABLET OPTIMIZATION --- */
+@media (min-width: 768px) {
+    .timer-display { 
+        font-size: 15vw; /* Scale back a bit on larger screens */
+    }
+    .status-display { 
+        font-size: 3vw;
+    }
+    .landing-text {
+        font-size: 3vw;
+    }
+    .modal-content {
+        max-width: 500px;
+    }
+}
