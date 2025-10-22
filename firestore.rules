@@ -6,36 +6,65 @@ service cloud.firestore {
     function isValidProjectCode(code) {
       return code.matches('^\\d{4}$'); 
     }
+    
+    // 2. CRITICAL SECURITY FIX: Check if the user is authenticated AND exists in the 'facilitators' collection
+    function isAuthorizedFacilitator() {
+      return request.auth != null && 
+             exists(/databases/$(database)/documents/facilitators/$(request.auth.uid));
+    }
+    
+    // 3. Helper to validate data types
+    function isValidNumberOrNull(value) {
+        return value is number || value == null;
+    }
+    function isValidTimestampOrNull(value) {
+        return value is timestamp || value == null;
+    }
 
+    // 4. Function encapsulating the entire CREATE condition (for the SET button)
+    function canCreateTimer(data) {
+        return data.status is string && 
+               data.projectCode is string &&
+               isValidNumberOrNull(data.durationSeconds) && 
+               isValidNumberOrNull(data.remainingAtPause) && 
+               isValidTimestampOrNull(data.startTime);
+    }
+    
+    // 5. Function encapsulating the entire UPDATE condition (for START/PAUSE/RESET)
+    function canUpdateTimer(data) {
+        return data.status is string && 
+               isValidNumberOrNull(data.durationSeconds) && 
+               isValidNumberOrNull(data.remainingAtPause) &&
+               isValidTimestampOrNull(data.startTime);
+    }
+
+
+    // A. Secure the Facilitator Whitelist Collection
+    match /facilitators/{userId} {
+        // Allow anyone (logged in or not) to read/check the existence of their own document (implicitly checked via isAuthorizedFacilitator function)
+        // However, a simple read for a logged-in user is usually fine.
+        allow read: if request.auth != null; 
+        allow write: if false; // Admin only writes
+    }
+
+
+    // B. Timer Collection Rules (The core app data)
     match /timers/{projectCode} {
       
-      // RULE 1: READ ACCESS (VIEWER MODE) - Remains secure and functional
-      // Anyone can read if the URL path is a valid 4-digit code.
+      // RULE 1: Read Access (VIEWER MODE)
       allow read: if isValidProjectCode(projectCode); 
       
-      // RULE 2: WRITE ACCESS (FACILITATOR CONTROL - FINAL FAILSAFE)
+      // RULE 2: Allow CREATE (SET button)
+      // Must be an authorized facilitator AND the data must be valid
+      allow create: if isAuthorizedFacilitator() &&
+                       isValidProjectCode(projectCode) &&
+                       canCreateTimer(request.resource.data);
 
-      // Allow CREATE (SET button) if:
-      // A) The user is authenticated (ANY Google account).
-      // B) The code is valid, and C) The document has the correct field types.
-      allow create: if request.auth != null && isValidProjectCode(projectCode) && (
-          request.resource.data.status is string 
-          && request.resource.data.durationSeconds is number 
-          && request.resource.data.remainingAtPause is number
-          && request.resource.data.projectCode is string
-      );
-
-      // Allow UPDATE (START/PAUSE button) if:
-      // A) The user is authenticated (ANY Google account).
-      // B) The code is valid, and C) ONLY the expected runtime fields are modified.
-      allow update: if request.auth != null && isValidProjectCode(projectCode) && (
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'status', 
-            'startTime', 
-            'remainingAtPause', 
-            'durationSeconds'
-          ])
-      );
+      // RULE 3: Allow UPDATE (START/PAUSE/RESET)
+      // Must be an authorized facilitator AND the data must be valid
+      allow update: if isAuthorizedFacilitator() &&
+                       isValidProjectCode(projectCode) &&
+                       canUpdateTimer(request.resource.data);
       
       allow delete: if false; 
     }
