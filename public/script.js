@@ -69,6 +69,33 @@ function calculateTimeRemaining(timerState) {
     return durationSeconds; 
 }
 
+// --- NEW FUNCTION: Manages the color of the timer based on remaining seconds ---
+function updateTimerColors(secondsLeft, status) {
+    // Reset all color classes first
+    timeDisplayEl.classList.remove('timer-orange', 'timer-red');
+    statusDisplayEl.classList.remove('status-red');
+
+    if (secondsLeft > 30) {
+        // Default: White
+        return;
+    } 
+    
+    if (secondsLeft <= 0) {
+        // Time Up/Finished: Red
+        timeDisplayEl.classList.add('timer-red');
+        if (status === 'stopped' || status === 'paused' || status === 'running') {
+            statusDisplayEl.classList.add('status-red');
+        }
+        return;
+    }
+    
+    if (secondsLeft <= 30) {
+        // Warning: Orange
+        timeDisplayEl.classList.add('timer-orange');
+    }
+}
+
+
 function startClientCountdown(timerState) {
     if (countdownInterval) {
         clearInterval(countdownInterval);
@@ -76,13 +103,16 @@ function startClientCountdown(timerState) {
 
     let secondsLeft = calculateTimeRemaining(timerState);
     
-    // --- Initial UI State Management ---
+    // --- Initial UI State Management (Including color check) ---
     const formattedTime = formatTime(secondsLeft);
     
     timeDisplayEl.textContent = formattedTime;
     statusDisplayEl.textContent = timerState.status.toUpperCase();
     
-    if (secondsLeft === 0 && timerState.status !== 'stopped') {
+    // Check colors immediately on state change
+    updateTimerColors(secondsLeft, timerState.status);
+    
+    if (secondsLeft <= 0 && timerState.status !== 'stopped') {
         statusDisplayEl.textContent = 'TIME UP!';
         timeDisplayEl.textContent = formatTime(0);
     }
@@ -116,6 +146,9 @@ function startClientCountdown(timerState) {
             secondsLeft = timerState.durationSeconds - elapsed;
             
             const currentFormattedTime = formatTime(secondsLeft);
+            
+            // Call color update every second
+            updateTimerColors(secondsLeft, timerState.status); 
 
             if (secondsLeft <= 0) {
                 timeDisplayEl.textContent = formatTime(0);
@@ -253,7 +286,7 @@ function startTimerInterface(code) {
     timerInterfaceEl.classList.remove('hidden'); 
     viewerLandingEl.classList.add('hidden'); 
 
-    // TWEAK 2 FIX: Just show the 4-digit code in the top left
+    // Just show the 4-digit code in the top left
     projectInfoEl.textContent = `${projectCode}`;
 
     db.collection('timers').doc(projectCode)
@@ -264,6 +297,10 @@ function startTimerInterface(code) {
                 // Timer is NOT set up for this code
                 timeDisplayEl.textContent = '00:00';
                 statusDisplayEl.textContent = isFacilitator ? 'Click SET in controls to create timer.' : 'Awaiting Setup...';
+                
+                // Reset colors if no timer is set
+                updateTimerColors(99999, 'stopped'); 
+                
                 if (modalTimeDisplayEl) modalTimeDisplayEl.textContent = '00:00';
                 clearInterval(countdownInterval);
                 return;
@@ -338,12 +375,11 @@ function initializeAppWithAuth(user) {
         isFacilitator = true; 
         authStatusInfoEl.innerHTML = `Signed in as: <strong>${user.email}</strong>`;
         
-        // FIX: Correctly sign out and reset app state
         logoutButton.innerHTML = '<i class="fas fa-sign-out-alt"></i> Sign out';
         logoutButton.onclick = () => { 
             auth.signOut().then(() => {
                 toggleControlModal(false);
-                initializeAppWithAuth(null); // Force reset of application state and UI
+                initializeAppWithAuth(null); 
             }).catch(error => {
                 console.error("Sign out error:", error);
                 initializeAppWithAuth(null); 

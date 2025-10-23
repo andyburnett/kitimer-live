@@ -32,10 +32,22 @@ body {
     font-family: 'Roboto Mono', monospace; /* Monospaced for consistent number width */
     font-size: min(20vh, 25vw); /* Ensures it fills largest possible area */
     font-weight: 700; 
-    color: #FFFFFF; /* High contrast white */
+    color: #FFFFFF; /* Default High contrast white */
     line-height: 1; /* Tight spacing */
     margin: 5vh 0;
     text-shadow: 0 0 15px rgba(255, 255, 255, 0.4); /* Subtle glow */
+    transition: color 0.5s; /* Smooth color transition */
+}
+
+/* WARNING COLORS (NEW) */
+.timer-orange {
+    color: #F39C12 !important; /* Amber Orange */
+    text-shadow: 0 0 15px rgba(243, 156, 18, 0.6) !important;
+}
+
+.timer-red {
+    color: #E74C3C !important; /* Strong Red */
+    text-shadow: 0 0 15px rgba(231, 76, 60, 0.8) !important;
 }
 
 .status-display { 
@@ -43,6 +55,11 @@ body {
     color: #AAAAAA; /* Gray for secondary info */
     font-weight: bold;
     letter-spacing: 0.2em;
+    transition: color 0.5s; /* Smooth color transition */
+}
+
+.status-red {
+    color: #E74C3C !important;
 }
 
 #project-info { 
