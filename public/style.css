@@ -46,11 +46,14 @@ body {
 }
 
 #project-info { 
+    /* Top Left Corner - Shows just the 4-digit code */
     position: absolute;
     top: 15px;
     left: 15px;
     font-size: 2vh; 
     color: #666666;
+    font-family: 'Roboto Mono', monospace;
+    letter-spacing: 0.1em;
 }
 
 /* --- LANDING PAGE STYLES --- */
@@ -91,10 +94,10 @@ body {
     cursor: pointer;
 }
 
-/* --- FACILITATOR TRIGGER --- */
+/* --- FACILITATOR TRIGGER (FIXED: Moved to Top Right) --- */
 #facilitator-trigger {
     position: absolute;
-    bottom: 20px;
+    top: 20px; 
     right: 20px;
     background: none;
     border: none;
@@ -102,7 +105,7 @@ body {
     font-size: 30px;
     cursor: pointer;
     transition: color 0.3s;
-    z-index: 5; /* Ensure it's above the timer numbers */
+    z-index: 5; 
 }
 
 #facilitator-trigger:hover {
@@ -121,7 +124,7 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 1000; /* Above all other content */
+    z-index: 1000;
 }
 
 .modal-content {
@@ -153,7 +156,7 @@ body {
     margin-bottom: 5px;
 }
 
-/* FIXED: Modal Time Display - Prominent for Facilitator */
+/* Modal Time Display - Prominent for Facilitator */
 .modal-time-display {
     font-family: 'Roboto Mono', monospace;
     font-size: 8vh; /* Make it large within the modal */
@@ -179,7 +182,6 @@ body {
     font-size: 0.95em;
 }
 
-/* Input Styles */
 .input-group-controls {
     display: flex;
     align-items: center;
@@ -261,7 +263,7 @@ body {
 /* --- DESKTOP/TABLET OPTIMIZATION --- */
 @media (min-width: 768px) {
     .timer-display { 
-        font-size: 15vw; /* Scale back a bit on larger screens */
+        font-size: 15vw;
     }
     .status-display { 
         font-size: 3vw;
