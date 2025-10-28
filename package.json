@@ -1,0 +1,8 @@
+{
+  "devDependencies": {
+    "cypress": "^15.5.0"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.5.0"
+  }
+}
