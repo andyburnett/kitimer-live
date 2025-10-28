@@ -73,7 +73,8 @@
 
     <script>
         // !! WARNING: REPLACE THE FIVE PLACEHOLDERS BELOW WITH YOUR ACTUAL VALUES !!
-        const firebaseConfig = {
+        // CRITICAL CHANGE: Attach config directly to the window object for reliable Cypress access.
+        window.firebaseConfig = {
             apiKey: "AIzaSyC5k9uA1-Iy1oRGV1kU_yHOk0A6TYDzo54",
             authDomain: "kitimer-live.firebaseapp.com",
             projectId: "kitimer-live",

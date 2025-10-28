@@ -3,6 +3,7 @@
     "cypress": "^15.5.0"
   },
   "dependencies": {
+    "axios": "^1.13.1",
     "firebase-admin": "^13.5.0"
   }
 }
