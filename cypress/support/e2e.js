@@ -1,44 +1,63 @@
 // cypress/support/e2e.js
 
+// 💡 IMPORTANT: These global variables must be exposed by script.js 
+// for Cypress to access them (e.g., via `var auth;`).
+
+// --- GLOBAL CLEANUP HOOK ---
+beforeEach(() => {
+    // 1. Clear Firestore data using the task registered in cypress.config.js
+    cy.log('Clearing Firestore and Auth Emulators...');
+    cy.task('clearFirestore'); 
+    
+    // 2. Clear Firebase Auth users and state using the task registered in cypress.config.js
+    cy.task('clearAuth'); 
+    
+    // 3. Clear browser state
+    cy.clearLocalStorage();
+    cy.clearCookies();
+    cy.log('Emulators and browser state cleared.');
+});
+
+// --- CYPRESS CUSTOM LOGIN COMMAND ---
 Cypress.Commands.add('login', (uid = 'facilitator-test-user-1') => {
   
-  // 1. Visit the page first.
-  cy.visit('/'); 
-  
-  // 2. Poll the window object, waiting for the function to exist.
-  // This is the most resilient form of waiting in Cypress.
-  cy.window({ timeout: 20000 })
-    .should(win => {
-        // Assert that the function exists directly on the object.
-        expect(win.firebase).to.have.property('initializeApp');
-    })
-    .then(win => {
-        
-        // 3. INITIALIZATION: Call the function that we just waited for.
-        // We wrap the promise returned by initializeApp to handle asynchronous setup.
-        return cy.wrap(win.firebase.initializeApp(win.firebaseConfig), { timeout: 15000 }).then(app => {
-            
-            // 4. Configure the client to connect to the EMULATORS
-            // The service functions (auth, firestore) must be present on the initialized app object.
-            const auth = app.auth();
-            const firestore = app.firestore();
-            
-            auth.useEmulator('http://localhost:9099'); 
-            firestore.useEmulator('localhost', 8080);
+    // 1. Visit the page and set emulator environment variables early.
+    cy.visit('/', {
+        onBeforeLoad(win) {
+            // Set global variables to force Firebase SDK to connect to emulators instantly
+            win.FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9099';
+            win.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
+            // Also set localStorage keys for compatibility
+            win.localStorage.setItem('firebase:hostnames:auth', '127.0.0.1:9099');
+            win.localStorage.setItem('firebase:hostnames:firestore', '127.0.0.1:8080');
+        },
+    }); 
 
-            // 5. Generate the test token (runs in Node.js)
-            return cy.task('createTestUserToken', uid).then(token => {
-                
-                // 6. Sign in and bypass the UI
-                return auth.signInWithCustomToken(token)
-                    .then(() => {
-                        cy.log(`Successfully signed in test user: ${uid}`);
-                    })
-                    .catch(error => {
-                        cy.log(`Firebase Login Failed: ${error.message}`);
-                        throw error;
-                    });
-            });
+    // 2. Initialize the Client SDK and wait for the 'auth' object to be present.
+    cy.window({ timeout: 15000 })
+        .should(win => {
+            // Check that the necessary deferred function exists
+            expect(win.initializeClientSDK).to.be.a('function');
+        })
+        .then(win => {
+            // Call the initialization function and explicitly wait for the Promise it returns.
+            return cy.wrap(win.initializeClientSDK(), { timeout: 15000 });
+        });
+
+    // 💡 CRITICAL FIX: Wait for the global 'auth' object to exist on the window
+    // (guarantees the SDK initialization is fully complete).
+    cy.window({ timeout: 10000 }).should('have.property', 'auth')
+
+    // 3. Generate the test token (runs in Node.js)
+    cy.task('createTestUserToken', uid).then(token => {
+
+        // 4. Sign in using the now guaranteed-present window.auth instance.
+        return cy.window().then(win => {
+            // NOTE: win.auth is guaranteed to exist by the previous command.
+            return win.auth.signInWithCustomToken(token)
+                .then(() => {
+                    cy.log(`Successfully signed in test user: ${uid}`);
+                });
         });
     });
 });

@@ -1,25 +1,41 @@
-// For format details, see https://aka.ms/devcontainer.json. For config options, see the
-// README at: https://github.com/devcontainers/templates/tree/main/src/javascript-node
 {
-	"name": "Node.js",
-	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-	"image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
-	"features": {
-		"ghcr.io/devcontainers-extra/features/firebase-cli:2": {}
-	}
+    "name": "Node.js (Synology Dev)",
+    "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+    "features": {
+        // KEEP: Firebase CLI
+        "ghcr.io/devcontainers-extra/features/firebase-cli:2": {},
+        
+        // ADD: The current official method for installing Cypress dependencies
+        // This is necessary because the Node image alone does not include Xvfb, gtk, etc.
+        "ghcr.io/devcontainers/features/node:1": {
+            "version": "lts",
+            // Include OS dependencies required for UI testing like Cypress
+            "withVscodeServer": true, 
+            "installPnpm": "false",
+            "installYarn": "false"
+        },
+        // *** 💡 ADD THIS JAVA FEATURE ***
+        "ghcr.io/devcontainers/features/java:1": {
+            "version": "latest",
+            "jdkDistro": "ms", // or "temurin", or "none" to use the base image's Java if any
+            "installMaven": "false",
+            "installGradle": "false"
+        },
+        "ghcr.io/devcontainers/features/common-utils:2": {}
+    },
 
-	// Features to add to the dev container. More info: https://containers.dev/features.
-	// "features": {},
+    // Forward required ports (5000 for Firebase Hosting, 1234 is typical for Cypress internal comms)
+    "forwardPorts": [5000, 1234, 8080], 
 
-	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	"forwardPorts": [4000, 4400, 5000],
+    // This command runs *after* features are installed
+    "postCreateCommand": "./setup_cypress.sh",
 
-	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "npm install",
-
-	// Configure tool-specific properties.
-	// "customizations": {},
-
-	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
-	// "remoteUser": "root"
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "dbaeumer.vscode-eslint",
+                "esbenp.prettier-vscode"
+            ]
+        }
+    }
 }
